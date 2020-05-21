@@ -14,6 +14,66 @@ app.use(logger('dev'));
 
 app.disable('etag');
 
+app.post('/SetSensorsValues', (req,res) => {
+    var body = req.body;
+    
+    console.log(body);
+
+    return;
+    if(body['Sensors'] === null || body['Sensors'] === undefined) {
+        console.log('INVALID SetSensorsValues, no sensors in body');
+    }
+
+    var appSensors = body['Sensors'];
+
+    for(var s=0;s<sensors.length;s++) {
+        var appSensor = sensors[s];
+
+        var sType = appSensor['SensorType'];
+        var sStringType = appSensor['SensorStringType'];
+        var sVendor = appSensor['SensorVendor'];
+        var sVersion = appSensor['SensorVersion'];
+        var sValues = appSensor['SensorValues'];
+
+        var lastTimeUpdated = new Date();
+
+        for(var i=0;i<sensorsValues.length;i++) {
+            var sensor = sensorsValues[i];
+            if(sensor.sType == sType
+            && sensor.sVendor == sVendor
+            && sensor.sVersion == sVersion) {
+                if(sValues !== null || sValues !== undefined)
+                {
+                    sensor.sValues = sValues;
+                } else {
+                    sensor.sValues = []
+                }
+                sensor.sLastTimeUpdated = lastTimeUpdated;
+                console.log('Updated> type: '+ sStringType + ', vendor: ' + sVendor + ', version: ' + sVersion.toString() + ', values: ' + sValues.toString());
+                return;
+            }
+        }
+        
+        var sensor = {};
+        sensor.sType = sType;
+        sensor.sStringType = sStringType;
+        sensor.sVendor = sVendor;
+        sensor.sVersion = sVersion;
+        if(sValues !== null || sValues !== undefined)
+        {
+            sensor.sValues = sValues;
+        } else {
+            sensor.sValues = []
+        }
+        sensor.sLastTimeUpdated = lastTimeUpdated;
+        
+        sensorsValues.push(sensor);
+        console.log('Added new Sensor> type: '+ sStringType + ', vendor: ' + sVendor + ', version: ' + sVersion.toString() + ', values: ' + sValues.toString());
+        
+    }
+    res.send('ok');
+});
+
 app.post('/SetSensorValues', (req,res) => {
     var body = req.body;
     var sType = body['SensorType'];
@@ -67,8 +127,7 @@ app.post('/SetVal', (req,res) => {
     res.send(`ok i:${i}`)
 })
 
-app.get('/', (req,res) => res.send(`Hello World! VAL: ${i}`));
-app.get('/SensorsValues', (req,res) => {
+app.get('/', (req,res) => {
     var html = ""+
     "<!DOCTYPE html>"+
         "<html>"+
