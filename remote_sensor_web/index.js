@@ -1,12 +1,11 @@
 const express = require('express');
-const bodyParser = require('body-parser')
 const logger = require('morgan');
 const app = express();
 const port = 3000;
 
 var sensorsValues = []
 
-app.use(bodyParser.json());
+app.use(express.json());
 
 var i = 0;
 
@@ -16,32 +15,33 @@ app.disable('etag');
 
 app.post('/SetSensorsValues', (req,res) => {
     var body = req.body;
-    
-    console.log(body);
 
-    return;
     if(body['Sensors'] === null || body['Sensors'] === undefined) {
         console.log('INVALID SetSensorsValues, no sensors in body');
     }
 
     var appSensors = body['Sensors'];
 
-    for(var s=0;s<sensors.length;s++) {
-        var appSensor = sensors[s];
+    if(appSensors.length == 0) {
+        console.log('EMPTY LIST SENDED');
+    }
 
-        var sType = appSensor['SensorType'];
-        var sStringType = appSensor['SensorStringType'];
-        var sVendor = appSensor['SensorVendor'];
-        var sVersion = appSensor['SensorVersion'];
-        var sValues = appSensor['SensorValues'];
+    for(var s=0;s<appSensors.length;s++) {
+        var appSensor = appSensors[s];
+
+        var sType = appSensor['Type'];
+        var sStringType = appSensor['StringType'];
+        var sVendor = appSensor['Vendor'];
+        var sVersion = appSensor['Version'];
+        var sValues = appSensor['Values'];
 
         var lastTimeUpdated = new Date();
 
+        var updated = false;
+
         for(var i=0;i<sensorsValues.length;i++) {
             var sensor = sensorsValues[i];
-            if(sensor.sType == sType
-            && sensor.sVendor == sVendor
-            && sensor.sVersion == sVersion) {
+            if(sensor.sType == sType) {
                 if(sValues !== null || sValues !== undefined)
                 {
                     sensor.sValues = sValues;
@@ -49,11 +49,13 @@ app.post('/SetSensorsValues', (req,res) => {
                     sensor.sValues = []
                 }
                 sensor.sLastTimeUpdated = lastTimeUpdated;
-                console.log('Updated> type: '+ sStringType + ', vendor: ' + sVendor + ', version: ' + sVersion.toString() + ', values: ' + sValues.toString());
-                return;
+                //console.log('Updated> type: '+ sStringType + ', vendor: ' + sVendor + ', version: ' + sVersion.toString() + ', values: ' + sValues.toString());
+                updated = true;
             }
         }
         
+        if(updated) continue;
+
         var sensor = {};
         sensor.sType = sType;
         sensor.sStringType = sStringType;
@@ -68,9 +70,10 @@ app.post('/SetSensorsValues', (req,res) => {
         sensor.sLastTimeUpdated = lastTimeUpdated;
         
         sensorsValues.push(sensor);
-        console.log('Added new Sensor> type: '+ sStringType + ', vendor: ' + sVendor + ', version: ' + sVersion.toString() + ', values: ' + sValues.toString());
-        
+        //console.log('Added new Sensor> type: '+ sStringType + ', vendor: ' + sVendor + ', version: ' + sVersion.toString() + ', values: ' + sValues.toString());
     }
+
+    console.log('Sensors added and updated.');
     res.send('ok');
 });
 
@@ -133,9 +136,29 @@ app.get('/', (req,res) => {
         "<html>"+
             "<head>"+
                 "<meta http-equiv=\"refresh\" content=\"1\">"+
+                "<style>"+
+                    "body {" +
+                    "}"+
+                    // "#main_content {"+
+                    //     "border-left: 1px solid black;"+
+                    //     "border-right: 1px solid black;"+
+                    //     "padding: 20px;"+
+                    // "}"+
+                    "#main_table { "+
+                        "font-family: monospace;"+
+                        "font-color: #444"+
+                        "width: 50%;"+
+                        "margin-left: auto;"+
+                        "margin-right: auto;"+  
+                    "}"+
+                    "table, th, td { "+
+                        " border: 1px solid black"+
+                    "}"+
+                "</style>"+
             "</head>"+
             "<body>"+
-                "<table>"+
+            "<div id=\"main_content\">"+
+                "<table id=\"main_table\">"+
                     "<thead>"+
                         "<tr>"+
                             "<th>SensorType</th>"+
@@ -159,10 +182,11 @@ app.get('/', (req,res) => {
                         "<td>"+sensor.sLastTimeUpdated.toISOString()+"</td>"+
                     "</tr>";
     }
-    html = html + "</tbody>"
-    html = html + "</table>";
-    html += "</body>"+
-        "</html>"+
+    html = html + "</tbody>"+
+                "</table>"+
+            "</div>"+
+        "</body>"+
+    "</html>"+
     res.send(html);
 });
 
