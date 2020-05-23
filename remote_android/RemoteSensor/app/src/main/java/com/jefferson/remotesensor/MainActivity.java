@@ -1,30 +1,47 @@
 package com.jefferson.remotesensor;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorDirectChannel;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Address;
+import android.location.Geocoder;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener {
+public class MainActivity extends AppCompatActivity implements SensorEventListener, LocationListener {
     private TextView txtSample;
     private Thread sendToApiThread;
     protected static boolean SensorSendToApiThread_ENABLED = false;
+
     @RequiresApi(api = Build.VERSION_CODES.KITKAT_WATCH)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,33 +49,209 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         setContentView(R.layout.activity_main);
 
         doSensorsSetup();
+        doLocationSetup();
 
         sendToApiThread = new Thread(new SensorSendToApiThread(this));
         sendToApiThread.start();
 
-        Button btn = findViewById(R.id.btn_request);
-        btn.setOnClickListener(new View.OnClickListener(){
+        final Button btnHabilitarEnvio = findViewById(R.id.btn_request);
+        btnHabilitarEnvio.setTextColor(Color.GREEN);
+        btnHabilitarEnvio.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 /// not used anymore.
                 SensorSendToApiThread_ENABLED = !SensorSendToApiThread_ENABLED;
+                if (SensorSendToApiThread_ENABLED) {
+                    if(sendToApiThread.isAlive() == false || sendToApiThread.isInterrupted() == true) {
+                        sendToApiThread.start();
+                    }
+                    btnHabilitarEnvio.setText("DESABILITAR");
+                    btnHabilitarEnvio.setTextColor(Color.RED);
+                } else {
+                    sendToApiThread.interrupt();
+                    btnHabilitarEnvio.setText("HABILITAR");
+                    btnHabilitarEnvio.setTextColor(Color.GREEN);
+                }
+            }
+        });
+
+        final Button btnSample = findViewById(R.id.btn_sample);
+        btnSample.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sendSensorsInformation();
             }
         });
 
 
     }
 
+    public static boolean LOCATION_SERVICE_ENABLED = false;
+
     class SensorSendToApiThread implements Runnable {
         private MainActivity main;
+
         public SensorSendToApiThread(MainActivity main) {
             SensorSendToApiThread.this.main = main;
         }
-        public void run(){
-            while(true){
-                try { Thread.sleep(500); } catch (Exception ex) { ex.printStackTrace(); }
-                if(MainActivity.SensorSendToApiThread_ENABLED) SensorSendToApiThread.this.main.sendSensorsInformation();
+
+        public void run() {
+            try {
+                while (true) {
+                    try {
+                        Thread.sleep(500);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                    if (MainActivity.this.locationAccessGranted && MainActivity.LOCATION_SERVICE_ENABLED) {
+                        System.out.println("Updating location...");
+                        updateLocation();
+                    } else {
+                        System.out.println("Unable to update location due to>" +
+                                "location access: " + (MainActivity.this.locationAccessGranted ? "true" : "false") +
+                                "service enabled: " + (MainActivity.LOCATION_SERVICE_ENABLED ? "true" : "false"));
+                    }
+                    if (MainActivity.SensorSendToApiThread_ENABLED)
+                        SensorSendToApiThread.this.main.sendSensorsInformation();
+                }
+            } catch (Exception ex) {
+                System.out.println("ERROR IN UPDATE THREAD");
+                ex.printStackTrace();
             }
         }
+    }
+
+    protected void updateLocation() {
+        try {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions( this, new String[] {  Manifest.permission.ACCESS_FINE_LOCATION  },
+                        MY_PERMISSION_ACCCESS_FINE_LOCATION );
+
+                return;
+            }
+
+            Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            locationSensor.SensorValues = new ArrayList<>();
+
+            updateLocation((float)location.getLatitude(), (float)location.getLongitude());
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private LocationManager locationManager;
+    SensorValue locationSensor;
+    public static final int MY_PERMISSION_ACCCESS_FINE_LOCATION = 500;
+    protected void doLocationSetup() {
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if ( ContextCompat.checkSelfPermission( this, android.Manifest.permission.ACCESS_COARSE_LOCATION ) != PackageManager.PERMISSION_GRANTED ) {
+
+            ActivityCompat.requestPermissions( this, new String[] {  Manifest.permission.ACCESS_FINE_LOCATION  },
+                    MY_PERMISSION_ACCCESS_FINE_LOCATION );
+
+            return;
+        }
+
+        locationAccessGranted = true;
+
+        LOCATION_SERVICE_ENABLED = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);;
+
+        if(LOCATION_SERVICE_ENABLED == false) {
+            Toast.makeText(this, "Por favor habilite a localização para utilizada no app.", Toast.LENGTH_LONG)
+                    .show();
+        }
+
+        for(int i=0;i<sensorsValues.size();i++) {
+            if(sensorsValues.get(i).SensorType == -1) {
+                sensorsValues.remove(i);
+            }
+        }
+
+        locationSensor = new SensorValue();
+        locationSensor.SensorStringType = "GPS_PROVIDER";
+        locationSensor.SensorType = -1;
+        locationSensor.SensorVendor = "DEFAULT";
+        locationSensor.SensorVersion = -1;
+        locationSensor.SensorValues = new ArrayList<String>();
+        sensorsValues.add(locationSensor);
+
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 5, this);
+    }
+
+    protected boolean locationAccessGranted = false;
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch(requestCode) {
+            case MY_PERMISSION_ACCCESS_FINE_LOCATION:
+                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    locationAccessGranted = true;
+                    LOCATION_SERVICE_ENABLED = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                    doLocationSetup();
+                } else {
+                    locationAccessGranted = false;
+                    Toast.makeText(this, "Por favor permita o serviço de localização para utilizada no app.", Toast.LENGTH_LONG)
+                            .show();
+
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+    @Override
+    public void onProviderEnabled(String provider) { LOCATION_SERVICE_ENABLED = true; }
+
+    @Override
+    public void onProviderDisabled(String provider) { LOCATION_SERVICE_ENABLED = false; }
+
+    public void updateLocation(float latitude, float longitude){
+
+        if(locationSensor != null) {
+            locationSensor.SensorValues = new ArrayList<String>();
+
+            Geocoder geocoder;
+            List<Address> addresses = null;
+            geocoder = new Geocoder(this, Locale.getDefault());
+
+            try {
+                addresses = geocoder.getFromLocation(latitude, longitude, 1);
+            } catch (IOException e) {
+                System.out.println("!!!! ERROR ON getFromLocation");
+                e.printStackTrace();
+            }
+
+            if(addresses != null) {
+                String address = addresses.get(0).getAddressLine(0);
+                String city = addresses.get(0).getLocality();
+                String state = addresses.get(0).getAdminArea();
+                String country = addresses.get(0).getCountryName();
+                String postalCode = addresses.get(0).getPostalCode();
+                String knownName = addresses.get(0).getFeatureName();
+
+
+                locationSensor.SensorValues.add(address == null ? "" : address);
+                locationSensor.SensorValues.add(city == null ? "" : city);
+                locationSensor.SensorValues.add(state == null ? "" : state);
+                locationSensor.SensorValues.add(country == null ? "" : country);
+//                locationSensor.SensorValues.add(postalCode == null ? "" : postalCode);
+//                locationSensor.SensorValues.add(knownName == null ? "" : knownName);
+            }
+        }
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        float latitude = (float)location.getLatitude();
+        float longitude = (float)location.getLongitude();
+
+        updateLocation(latitude, longitude);
     }
 
     private SensorManager sensorManager;
@@ -74,7 +267,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 SensorValue sensorValue = new SensorValue();
                 sensorValue.SensorType = sensor.getType();
                 sensorValue.SensorStringType = sensor.getStringType();
-                sensorValue.SensorValues = new ArrayList<Float>();
+                sensorValue.SensorValues = new ArrayList<String>();
                 sensorValue.SensorVendor = sensor.getVendor();
                 sensorValue.SensorVersion = sensor.getVersion();
                 sensorValue.SensorChanged = true;
@@ -85,6 +278,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             } // else sensor não existe.
         }
 
+        resumeSensors();
 
         txtSample = (TextView)findViewById(R.id.txt_sample_vw);
         txtSample.setText("Sensor " + sensorsValues.size());
@@ -98,7 +292,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public class SensorValue {
         public int SensorType;
         public String SensorStringType;
-        public List<Float> SensorValues;
+        public List<String> SensorValues;
         public String SensorVendor;
         public int SensorVersion;
         public boolean SensorChanged;
@@ -109,12 +303,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onSensorChanged(SensorEvent event) {
         for(SensorValue sensorValue : sensorsValues) {
-            if(sensorValue.SensorType == event.sensor.getType()
-            && sensorValue.SensorVendor.equals(event.sensor.getVendor())
-            && sensorValue.SensorVersion == event.sensor.getVersion()) {
-                sensorValue.SensorValues = new ArrayList<Float>();
-                for(float value : event.values) sensorValue.SensorValues.add(value);
+            if(0==0
+                && sensorValue.SensorType == event.sensor.getType()
+                //&& sensorValue.SensorVendor.equals(event.sensor.getVendor())
+                //&& sensorValue.SensorVersion == event.sensor.getVersion()
+            ) {
+                sensorValue.SensorValues.clear();
+                for(float value : event.values) sensorValue.SensorValues.add(value+"");
                 sensorValue.SensorChanged = true;
+                JSONArray arr = new JSONArray(sensorValue.SensorValues);
+                String strValues = arr.toString();
             }
         }
     }
@@ -142,31 +340,47 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
 
+    private static final String SERVER_URL = "https://remotesensorjeffraf.azurewebsites.net";
+
+    private String getSetSensorsValuesURL() {
+        return SERVER_URL + "/SetSensorsValues";
+    }
+
     protected void sendSensorsInformation() {
-        sensorManager.unregisterListener(this);
+        //sensorManager.unregisterListener(this);
         try {
-            String url = "http://192.168.0.10:3000/SetSensorValues";
+            List<JSONObject> listSensorJSON = new ArrayList<>();
 
             for(SensorValue sensor : sensorsValues) {
-                if(sensor.SensorChanged == false) continue;
-                sensor.SensorChanged = false;
-                JSONObject data = new JSONObject();
+                JSONObject sensorJsonObject = new JSONObject();
 
-                data.put("SensorType", sensor.SensorType);
-                data.put("SensorStringType", sensor.SensorStringType);
-                data.put("SensorVendor", sensor.SensorVendor);
-                data.put("SensorVersion", sensor.SensorVersion);
+                sensorJsonObject.put("Type", sensor.SensorType);
+                sensorJsonObject.put("StringType", sensor.SensorStringType);
+                sensorJsonObject.put("Vendor", sensor.SensorVendor);
+                sensorJsonObject.put("Version", sensor.SensorVersion);
 
                 JSONArray values = new JSONArray(sensor.SensorValues);
-                data.put("SensorValues", values);
-
-                CallAPI callAPI = new CallAPI(url);
-                callAPI.setParameters(data);
-                callAPI.execute();
+                sensorJsonObject.put("Values", values);
+                listSensorJSON.add(sensorJsonObject);
             }
+
+            JSONObject data = new JSONObject();
+            data.put("Sensors", new JSONArray(listSensorJSON));
+
+            String url = getSetSensorsValuesURL();
+            CallAPI callAPI = new CallAPI(url);
+            callAPI.setParameters(data);
+
+            new Thread(callAPI).start();
+
+            System.out.println("Call Api passed execute");
         } catch(Exception ex) {
-            System.out.println("AN ERROR OCCURRED:");
+            System.out.println("AN ERROR OCCURRED TRYING TO SEND INFORMATION TO THE SERVER:");
             ex.printStackTrace();
         }
     }
+
+    private int sendedTimes = 0;
+
+    private String serverIp = "192.168.0.16";
 }
