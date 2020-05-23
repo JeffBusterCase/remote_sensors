@@ -5,11 +5,22 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
+
+    <Spinner
+        android:id="@+id/spinner_language"
+        android:layout_width="wrap_content"
+        android:layout_height="50dp"
+        android:background="@android:drawable/btn_dropdown"
+        android:spinnerMode="dropdown"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="50dp"
+        android:layout_marginBottom="20dp"/>
+
     <TextView
         android:id="@+id/access_url"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Visualizar na web: remotesensorjeffraf.azurewebsites.net"
+        android:text="@string/link_web"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="20dp"
         android:layout_marginTop="150dp"/>
@@ -17,7 +28,7 @@
         android:id="@+id/txt_sample_vw"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Sensors: 0"
+        android:text="@string/qtd_sensors_str"
         android:layout_centerHorizontal="true"
         android:layout_centerVertical="true"
         android:layout_marginBottom="20dp"/>
@@ -26,7 +37,7 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_marginTop="20dp"
-        android:text="Habilitar"
+        android:text="@string/txt_habilitar"
         android:layout_centerHorizontal="true"
         android:layout_below="@id/txt_sample_vw"/>
     <Button
@@ -34,7 +45,7 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_marginTop="20dp"
-        android:text="Enviar Unica vez"
+        android:text="@string/txt_envio_unico_btn"
         android:layout_centerHorizontal="true"
         android:layout_below="@id/btn_request"
         android:textColor="@android:color/holo_blue_bright"

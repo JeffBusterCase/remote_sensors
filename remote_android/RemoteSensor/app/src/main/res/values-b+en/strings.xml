@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Remote Sensor</string>
+    <string name="link_web">Visualize on the web: remotesensorjeffraf.azurewebsites.net</string>
+    <string name="qtd_sensors_str">Sensors</string>
+    <string name="txt_habilitar">Enable</string>
+    <string name="txt_desabilitar">Disable</string>
+    <string name="txt_envio_unico_btn">Send only once</string>
+    <string name="txt_permitir_localizacao">Please allow localization access to be used on the app.</string>
+    <string name="txt_habilitar_localizacao">Please enable the localization to be used on the app.</string>
+</resources>

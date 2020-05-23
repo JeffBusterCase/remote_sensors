@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">リモートセンサー</string>
+    <string name="link_web">ウェブ上で視覚化: remotesensorjeffraf.azurewebsites.net</string>
+    <string name="qtd_sensors_str">センサー</string>
+    <string name="txt_habilitar">有効にする</string>
+    <string name="txt_desabilitar">無効にする</string>
+    <string name="txt_envio_unico_btn">1回だけ送信する</string>
+    <string name="txt_permitir_localizacao">アプリで使用するために位置情報サービスを有効にしてください</string>
+    <string name="txt_habilitar_localizacao">アプリで使用する場所を有効にしてください</string>
+</resources>

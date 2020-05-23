@@ -8,11 +8,11 @@ import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.pm.ActivityInfo;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.hardware.Sensor;
-import android.hardware.SensorDirectChannel;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
@@ -21,11 +21,13 @@ import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.location.LocationProvider;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,7 +48,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setLocale();
+
         setContentView(R.layout.activity_main);
+
+        doLanguageSpinnerSetup();
 
         doSensorsSetup();
         doLocationSetup();
@@ -65,11 +71,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     if(sendToApiThread.isAlive() == false || sendToApiThread.isInterrupted() == true) {
                         sendToApiThread.start();
                     }
-                    btnHabilitarEnvio.setText("DESABILITAR");
+                    btnHabilitarEnvio.setText(getResources().getText(R.string.txt_desabilitar));
                     btnHabilitarEnvio.setTextColor(Color.RED);
                 } else {
                     sendToApiThread.interrupt();
-                    btnHabilitarEnvio.setText("HABILITAR");
+                    btnHabilitarEnvio.setText(getResources().getText(R.string.txt_habilitar));
                     btnHabilitarEnvio.setTextColor(Color.GREEN);
                 }
             }
@@ -82,8 +88,87 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 sendSensorsInformation();
             }
         });
+    }
 
+    private static final String[] LANGUAGES =  new String[] {"Português", "English", "日本語"};
 
+    private static String selectedLanguage = "pt";
+    protected Spinner spinnerLanguage;
+
+    public void doLanguageSpinnerSetup() {
+        spinnerLanguage = (Spinner)findViewById(R.id.spinner_language);
+
+        final ArrayAdapter<String> adapter;
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, LANGUAGES);
+
+        spinnerLanguage.setAdapter(adapter);
+        int lang = -1;
+        switch(selectedLanguage) {
+            case "pt":
+                lang = 0;
+                break;
+            case "en":
+                lang = 1;
+                break;
+            case "jp":
+                lang = 2;
+                break;
+
+        }
+        spinnerLanguage.setSelection(lang);
+
+        spinnerLanguage.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                int lang = -1;
+                switch(selectedLanguage) {
+                    case "pt":
+                        lang = 0;
+                        break;
+                    case "en":
+                        lang = 1;
+                        break;
+                    case "jp":
+                        lang = 2;
+                        break;
+
+                }
+
+                spinnerLanguage.setSelection(lang);
+            }
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String language = LANGUAGES[position];
+
+                String newLang = "";
+                switch(language) {
+                    case "Português":
+                        newLang = "pt";
+                        break;
+                    case "English":
+                        newLang = "en";
+                        break;
+                    case "日本語":
+                        newLang = "jp";
+                        break;
+                }
+
+                if(newLang.equals(selectedLanguage) == false) {
+                    selectedLanguage = newLang;
+                    Intent intent = getIntent();
+                    overridePendingTransition(0,0);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                    finish();
+                    overridePendingTransition(0,0);
+                    startActivity(intent);
+//                    spinnerLanguage.setAdapter(adapter);
+//                    setLocale();
+//                    setContentView(R.layout.activity_main);
+//                    MainActivity.this.doLanguageSpinnerSetup();
+                }
+            }
+        });
     }
 
     public static boolean LOCATION_SERVICE_ENABLED = false;
@@ -158,7 +243,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         LOCATION_SERVICE_ENABLED = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);;
 
         if(LOCATION_SERVICE_ENABLED == false) {
-            Toast.makeText(this, "Por favor habilite a localização para utilizada no app.", Toast.LENGTH_LONG)
+            Toast.makeText(this, getResources().getText(R.string.txt_habilitar_localizacao), Toast.LENGTH_LONG)
                     .show();
         }
 
@@ -192,9 +277,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     doLocationSetup();
                 } else {
                     locationAccessGranted = false;
-                    Toast.makeText(this, "Por favor permita o serviço de localização para utilizada no app.", Toast.LENGTH_LONG)
+                    Toast.makeText(this, getResources().getText(R.string.txt_permitir_localizacao), Toast.LENGTH_LONG)
                             .show();
-
                 }
                 break;
             default:
@@ -240,8 +324,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 locationSensor.SensorValues.add(city == null ? "" : city);
                 locationSensor.SensorValues.add(state == null ? "" : state);
                 locationSensor.SensorValues.add(country == null ? "" : country);
-//                locationSensor.SensorValues.add(postalCode == null ? "" : postalCode);
-//                locationSensor.SensorValues.add(knownName == null ? "" : knownName);
+                locationSensor.SensorValues.add(postalCode == null ? "" : postalCode);
+                locationSensor.SensorValues.add(knownName == null ? "" : knownName);
             }
         }
     }
@@ -280,8 +364,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         resumeSensors();
 
+        updateQtdSensor();
+    }
+
+    public void updateQtdSensor() {
         txtSample = (TextView)findViewById(R.id.txt_sample_vw);
-        txtSample.setText("Sensor " + sensorsValues.size());
+        String qtdSensorsStr = getResources().getText(R.string.qtd_sensors_str).toString();
+        txtSample.setText(qtdSensorsStr + " " + sensorsValues.size());
     }
 
     @Override
@@ -380,7 +469,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
-    private int sendedTimes = 0;
+    public void setLocale() {
+        Locale locale;
+        //Sessions session = new Sessions(this);
+        //Log.e("Lan",session.getLanguage());
+        locale = new Locale(selectedLanguage);
+        Configuration config = new Configuration(getResources().getConfiguration());
+        Locale.setDefault(locale);
+        config.setLocale(locale);
 
-    private String serverIp = "192.168.0.16";
+        this.getBaseContext().getResources().updateConfiguration(config,
+                this.getBaseContext().getResources().getDisplayMetrics());
+    }
 }
