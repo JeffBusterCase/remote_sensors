@@ -1,10 +1,8 @@
 # remote_sensors
 Envia dados dos sensores para um servidor web.
 
-# Configuração
-Editar IP do servidor via arquivo:
-    RemoteSensor\app\src\main\res\xml\network_security_config.xml
-    * chave: `domain`
+# Download App
+https://drive.google.com/file/d/1GMWD97LX97q3QN5jN-6RGFZ81llXWG-R/view?usp=sharing
 
 # Web Dashboard
 Acesse https://remotesensorjeffraf.azurewebsites.net
